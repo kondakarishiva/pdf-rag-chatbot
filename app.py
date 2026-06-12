@@ -10,9 +10,6 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
 
-# ----------------------------------
-# PAGE CONFIG
-# ----------------------------------
 st.set_page_config(
     page_title="PDF RAG Chatbot",
     page_icon="📚"
@@ -20,9 +17,6 @@ st.set_page_config(
 
 st.title("📚 PDF RAG Chatbot")
 
-# ----------------------------------
-# API KEY INPUT
-# ----------------------------------
 api_key = st.text_input(
     "Enter Gemini API Key",
     type="password"
@@ -31,17 +25,12 @@ api_key = st.text_input(
 if api_key:
 
     try:
+
         os.environ["GOOGLE_API_KEY"] = api_key
 
-        # ----------------------------------
-        # LOAD DOCUMENT
-        # ----------------------------------
         loader = TextLoader("document.txt")
         docs = loader.load()
 
-        # ----------------------------------
-        # SPLIT DOCUMENT
-        # ----------------------------------
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
             chunk_overlap=50
@@ -49,16 +38,10 @@ if api_key:
 
         chunks = splitter.split_documents(docs)
 
-        # ----------------------------------
-        # EMBEDDINGS
-        # ----------------------------------
         embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
 
-        # ----------------------------------
-        # VECTOR DATABASE
-        # ----------------------------------
         db = FAISS.from_documents(
             chunks,
             embeddings
@@ -66,17 +49,11 @@ if api_key:
 
         retriever = db.as_retriever()
 
-        # ----------------------------------
-        # GEMINI MODEL
-        # ----------------------------------
         llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
             temperature=0
         )
 
-        # ----------------------------------
-        # RAG CHAIN
-        # ----------------------------------
         qa = RetrievalQA.from_chain_type(
             llm=llm,
             retriever=retriever
@@ -84,9 +61,6 @@ if api_key:
 
         st.success("✅ RAG System Ready")
 
-        # ----------------------------------
-        # USER QUESTION
-        # ----------------------------------
         query = st.text_input("Ask a Question")
 
         if query:
