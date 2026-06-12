@@ -1,9 +1,8 @@
-
 import streamlit as st
 import os
 
 from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -11,10 +10,19 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
 
-st.set_page_config(page_title="RAG Chatbot")
+# ----------------------------------
+# PAGE CONFIG
+# ----------------------------------
+st.set_page_config(
+    page_title="PDF RAG Chatbot",
+    page_icon="📚"
+)
 
-st.title("PDF RAG Chatbot")
+st.title("📚 PDF RAG Chatbot")
 
+# ----------------------------------
+# API KEY INPUT
+# ----------------------------------
 api_key = st.text_input(
     "Enter Gemini API Key",
     type="password"
@@ -22,42 +30,81 @@ api_key = st.text_input(
 
 if api_key:
 
-    os.environ["GOOGLE_API_KEY"] = api_key
+    try:
+        os.environ["GOOGLE_API_KEY"] = api_key
 
-    loader = TextLoader("document.txt")
+        # ----------------------------------
+        # LOAD DOCUMENT
+        # ----------------------------------
+        loader = TextLoader("document.txt")
+        docs = loader.load()
 
-    docs = loader.load()
+        # ----------------------------------
+        # SPLIT DOCUMENT
+        # ----------------------------------
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50
+        )
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
-    )
+        chunks = splitter.split_documents(docs)
 
-    chunks = splitter.split_documents(docs)
+        # ----------------------------------
+        # EMBEDDINGS
+        # ----------------------------------
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+        # ----------------------------------
+        # VECTOR DATABASE
+        # ----------------------------------
+        db = FAISS.from_documents(
+            chunks,
+            embeddings
+        )
 
-    db = FAISS.from_documents(
-        chunks,
-        embeddings
-    )
+        retriever = db.as_retriever()
 
-    retriever = db.as_retriever()
+        # ----------------------------------
+        # GEMINI MODEL
+        # ----------------------------------
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0
+        )
 
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        temperature=0
-    )
+        # ----------------------------------
+        # RAG CHAIN
+        # ----------------------------------
+        qa = RetrievalQA.from_chain_type(
+            llm=llm,
+            retriever=retriever
+        )
 
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever
-    )
+        st.success("✅ RAG System Ready")
 
-    query = st.text_input("Ask Question")
+        # ----------------------------------
+        # USER QUESTION
+        # ----------------------------------
+        query = st.text_input("Ask a Question")
 
-    if query:
-        answer = qa.run(query)
-        st.write(answer)
+        if query:
+
+            with st.spinner("Thinking..."):
+
+                result = qa.invoke(
+                    {"query": query}
+                )
+
+                st.subheader("Answer")
+
+                st.write(
+                    result["result"]
+                )
+
+    except Exception as e:
+
+        st.error(
+            f"Error: {str(e)}"
+        )
